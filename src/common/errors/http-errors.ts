@@ -46,6 +46,39 @@ export class ConflictAppError extends AppError {
   }
 }
 
+export class AuthenticationAppError extends AppError {
+  public constructor(message = 'Authentication failed.', details?: Record<string, unknown>) {
+    super(message, {
+      code: 'AUTHENTICATION_FAILED',
+      details,
+      hint: 'Provide valid authentication credentials and try again.',
+      statusCode: StatusCodes.UNAUTHORIZED,
+    });
+  }
+}
+
+export class AuthorizationAppError extends AppError {
+  public constructor(message = 'You are not allowed to access this resource.', details?: Record<string, unknown>) {
+    super(message, {
+      code: 'AUTHORIZATION_FAILED',
+      details,
+      hint: 'Use an account with the required permission and try again.',
+      statusCode: StatusCodes.FORBIDDEN,
+    });
+  }
+}
+
+export class ExternalAuthProviderError extends AppError {
+  public constructor(provider: string, message = 'External authentication provider rejected the token.') {
+    super(message, {
+      code: 'EXTERNAL_AUTH_PROVIDER_ERROR',
+      details: { provider },
+      hint: `Verify the ${provider} client configuration and identity token.`,
+      statusCode: StatusCodes.UNAUTHORIZED,
+    });
+  }
+}
+
 export class DuplicateResourceError extends AppError {
   public constructor(resourceName: string, details?: Record<string, unknown>) {
     super(`${resourceName} already exists.`, {

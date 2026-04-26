@@ -1,7 +1,8 @@
 import { Router } from 'express';
 
-import type { RouteModule } from '../common/http/base-route';
+import { joinRoutePaths, type ApiRouteDefinition, type RouteModule } from '../common/http/base-route';
 import { aiRoute } from './ai/ai.route';
+import { authRoute } from './auth/auth.route';
 import { healthRoute } from './health/health.route';
 import { hydrationPlanRoute } from './hydration-plans/hydration-plan.route';
 import { intakeLogRoute } from './intake-logs/intake-log.route';
@@ -19,6 +20,16 @@ export class ApiModuleRegistry {
     return this.router;
   }
 
+  public getRouteDefinitions(apiPrefix = ''): ApiRouteDefinition[] {
+    return this.modules.flatMap((module) =>
+      module.getRouteDefinitions().map((route) => ({
+        ...route,
+        basePath: module.basePath,
+        fullPath: joinRoutePaths(apiPrefix, module.basePath, route.path),
+      })),
+    );
+  }
+
   private registerModules(): void {
     this.modules.forEach((module) => {
       this.router.use(module.basePath, module.router);
@@ -28,6 +39,7 @@ export class ApiModuleRegistry {
 
 export const apiModuleRegistry = new ApiModuleRegistry([
   healthRoute,
+  authRoute,
   aiRoute,
   hydrationPlanRoute,
   intakeLogRoute,
