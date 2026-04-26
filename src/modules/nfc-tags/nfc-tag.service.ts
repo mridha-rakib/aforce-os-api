@@ -2,12 +2,18 @@ import {
   ConflictAppError,
   ResourceNotFoundError,
 } from '../../common/errors/http-errors';
-import { NfcTagModel } from './nfc-tag.model';
+import {
+  nfcTagRepository,
+  type NfcTagRecord,
+  type NfcTagRepository,
+} from './nfc-tag.repository';
 import type { RegisterNfcTagInput, ScanNfcTagInput } from './nfc-tag.schema';
 
 export class NfcTagService {
-  public async getTagByUid(tagUid: string): Promise<Record<string, unknown>> {
-    const tag = await NfcTagModel.findOne({ tagUid: tagUid.toUpperCase() }).lean().exec();
+  public constructor(private readonly repository: NfcTagRepository) {}
+
+  public async getTagByUid(tagUid: string): Promise<NfcTagRecord> {
+    const tag = await this.repository.findByUid(tagUid);
 
     if (!tag) {
       throw new ResourceNotFoundError('NFC tag', { tagUid });
@@ -16,29 +22,12 @@ export class NfcTagService {
     return tag;
   }
 
-  public async registerTag(input: RegisterNfcTagInput): Promise<Record<string, unknown>> {
-    const created = new NfcTagModel({
-      batchCode: input.batchCode,
-      electrolyteBoost: input.electrolyteBoost,
-      hydrationBoost: input.hydrationBoost,
-      productName: input.productName,
-      productSku: input.productSku.toUpperCase(),
-      status: input.status,
-      tagUid: input.tagUid.toUpperCase(),
-      volumeMl: input.volumeMl,
-    });
-
-    if (input.flavor) {
-      created.flavor = input.flavor;
-    }
-
-    await created.save();
-
-    return created.toJSON();
+  public async registerTag(input: RegisterNfcTagInput): Promise<NfcTagRecord> {
+    return this.repository.create(input);
   }
 
   public async resolveScan(input: ScanNfcTagInput): Promise<Record<string, unknown>> {
-    const tag = await NfcTagModel.findOne({ tagUid: input.tagUid.toUpperCase() }).exec();
+    const tag = await this.repository.findByUid(input.tagUid);
 
     if (!tag) {
       throw new ResourceNotFoundError('NFC tag', { tagUid: input.tagUid });
@@ -52,20 +41,26 @@ export class NfcTagService {
       );
     }
 
-    tag.lastScannedAt = input.scannedAt ?? new Date();
-    await tag.save();
+    const updatedTag = await this.repository.updateLastScannedAt(
+      tag.tagUid,
+      input.scannedAt ?? new Date(),
+    );
+
+    if (!updatedTag) {
+      throw new ResourceNotFoundError('NFC tag', { tagUid: input.tagUid });
+    }
 
     return {
       scanAccepted: true,
-      tag: tag.toObject(),
+      tag: updatedTag,
       userId: input.userId,
       nextAction: 'create-intake-log',
       hydrationImpact: {
-        hydrationBoost: tag.hydrationBoost,
-        electrolyteBoost: tag.electrolyteBoost,
+        hydrationBoost: updatedTag.hydrationBoost,
+        electrolyteBoost: updatedTag.electrolyteBoost,
       },
     };
   }
 }
 
-export const nfcTagService = new NfcTagService();
+export const nfcTagService = new NfcTagService(nfcTagRepository);
