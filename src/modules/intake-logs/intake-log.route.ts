@@ -10,8 +10,18 @@ export class IntakeLogRoute extends BaseRoute {
   }
 
   protected registerRoutes(): void {
-    this.post('/', RequestValidator.validate(createIntakeLogRequestSchema), this.controller.createLog);
-    this.get('/', RequestValidator.validate(listIntakeLogsRequestSchema), this.controller.listLogs);
+    this.post(
+      '/',
+      { name: 'Create Intake Log' },
+      RequestValidator.validate(createIntakeLogRequestSchema),
+      this.controller.createLog,
+    );
+    this.get(
+      '/',
+      { name: 'List Intake Logs' },
+      RequestValidator.validate(listIntakeLogsRequestSchema),
+      this.controller.listLogs,
+    );
   }
 }
 

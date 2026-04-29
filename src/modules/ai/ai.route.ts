@@ -12,6 +12,7 @@ export class AiRoute extends BaseRoute {
   protected registerRoutes(): void {
     this.post(
       '/hydration-decision',
+      { name: 'Get Hydration Decision' },
       RequestValidator.validate(hydrationDecisionRequestSchema),
       this.controller.getHydrationDecision,
     );

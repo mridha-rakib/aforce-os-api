@@ -6,7 +6,6 @@ import type {
   LoginInput,
   LogoutInput,
   RefreshInput,
-  RegisterAdminInput,
   RegisterInput,
   ResendVerificationInput,
   VerifyEmailInput,
@@ -20,11 +19,6 @@ export class AuthController extends BaseController {
   public readonly register = this.handleRequest(async (request, response) => {
     const result = await this.service.register(request.body as RegisterInput);
     this.created(response, 'Registration created. Verify your email before login.', result);
-  });
-
-  public readonly registerAdmin = this.handleRequest(async (request, response) => {
-    const result = await this.service.registerAdmin(request.body as RegisterAdminInput);
-    this.created(response, 'Admin registration created. Verify your email before login.', result);
   });
 
   public readonly login = this.handleRequest(async (request, response) => {

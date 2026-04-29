@@ -1,9 +1,6 @@
 import { BaseRoute } from '../../common/http/base-route';
 import { RequestValidator } from '../../common/http/validate-request';
-import {
-  hydrationPlanController,
-  type HydrationPlanController,
-} from './hydration-plan.controller';
+import { hydrationPlanController, type HydrationPlanController } from './hydration-plan.controller';
 import { hydrationPlanRequestSchema } from './hydration-plan.schema';
 
 export class HydrationPlanRoute extends BaseRoute {
@@ -15,6 +12,7 @@ export class HydrationPlanRoute extends BaseRoute {
   protected registerRoutes(): void {
     this.post(
       '/generate',
+      { name: 'Generate Hydration Plan' },
       RequestValidator.validate(hydrationPlanRequestSchema),
       this.controller.generatePlan,
     );

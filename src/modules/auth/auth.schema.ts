@@ -17,10 +17,6 @@ export const registerBodySchema = z.object({
   password: passwordSchema,
 });
 
-export const registerAdminBodySchema = registerBodySchema.extend({
-  adminRegistrationSecret: z.string().min(1),
-});
-
 export const loginBodySchema = z.object({
   email: emailSchema,
   password: z.string().min(1),
@@ -55,10 +51,6 @@ export const registerRequestSchema = {
   body: registerBodySchema,
 };
 
-export const registerAdminRequestSchema = {
-  body: registerAdminBodySchema,
-};
-
 export const loginRequestSchema = {
   body: loginBodySchema,
 };
@@ -88,7 +80,6 @@ export const appleLoginRequestSchema = {
 };
 
 export type RegisterInput = z.infer<typeof registerBodySchema>;
-export type RegisterAdminInput = z.infer<typeof registerAdminBodySchema>;
 export type LoginInput = z.infer<typeof loginBodySchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailBodySchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationBodySchema>;

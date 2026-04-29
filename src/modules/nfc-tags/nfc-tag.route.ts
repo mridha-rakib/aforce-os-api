@@ -14,9 +14,24 @@ export class NfcTagRoute extends BaseRoute {
   }
 
   protected registerRoutes(): void {
-    this.post('/register', RequestValidator.validate(registerNfcTagRequestSchema), this.controller.register);
-    this.post('/scan', RequestValidator.validate(scanNfcTagRequestSchema), this.controller.resolveScan);
-    this.get('/:tagUid', RequestValidator.validate(getNfcTagRequestSchema), this.controller.getByUid);
+    this.post(
+      '/register',
+      { name: 'Register NFC Tag' },
+      RequestValidator.validate(registerNfcTagRequestSchema),
+      this.controller.register,
+    );
+    this.post(
+      '/scan',
+      { name: 'Resolve NFC Scan' },
+      RequestValidator.validate(scanNfcTagRequestSchema),
+      this.controller.resolveScan,
+    );
+    this.get(
+      '/:tagUid',
+      { name: 'Get NFC Tag By UID' },
+      RequestValidator.validate(getNfcTagRequestSchema),
+      this.controller.getByUid,
+    );
   }
 }
 

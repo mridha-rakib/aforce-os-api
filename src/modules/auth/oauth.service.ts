@@ -4,7 +4,7 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 
 import { ExternalAuthProviderError } from '../../common/errors/http-errors';
-import { env } from '../../config/env';
+import { env, getGoogleClientIds } from '../../config/env';
 
 interface GoogleIdentity {
   readonly avatarUrl?: string;
@@ -35,20 +35,22 @@ type AppleJwtPayload = jwt.JwtPayload & {
 };
 
 export class OAuthService {
-  private readonly googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID || undefined);
+  private readonly googleClient = new OAuth2Client();
   private appleKeysCache?: {
     readonly expiresAt: number;
     readonly keys: AppleJsonWebKey[];
   };
 
   public async verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity> {
-    if (!env.GOOGLE_CLIENT_ID) {
+    const googleClientIds = getGoogleClientIds();
+
+    if (googleClientIds.length === 0) {
       throw new ExternalAuthProviderError('google', 'Google login is not configured.');
     }
 
     try {
       const ticket = await this.googleClient.verifyIdToken({
-        audience: env.GOOGLE_CLIENT_ID,
+        audience: googleClientIds,
         idToken,
       });
       const payload = ticket.getPayload();

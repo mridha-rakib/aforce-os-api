@@ -25,12 +25,17 @@ const envSchema = z.object({
     .min(32)
     .default('change-me-local-email-secret-minimum-32-characters'),
   EMAIL_VERIFICATION_TTL_SECONDS: z.coerce.number().int().positive().default(24 * 60 * 60),
-  ADMIN_REGISTRATION_SECRET: z.string().min(16).default('change-me-local-admin-registration-secret'),
+  ADMIN_EMAIL: z.string().default(''),
+  ADMIN_PASSWORD: z.string().default(''),
+  ADMIN_DISPLAY_NAME: z.string().default('AForce Admin'),
   APP_WEB_URL: z.string().url().default('http://localhost:5173'),
   APP_MOBILE_DEEP_LINK: z.string().min(1).default('aforce://auth'),
   RESEND_API_KEY: z.string().default(''),
   EMAIL_FROM: z.string().min(1).default('AForce <noreply@localhost>'),
   GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_WEB_CLIENT_ID: z.string().default(''),
+  GOOGLE_ANDROID_CLIENT_ID: z.string().default(''),
+  GOOGLE_IOS_CLIENT_ID: z.string().default(''),
   APPLE_CLIENT_ID: z.string().default(''),
 });
 
@@ -51,4 +56,19 @@ export function getCorsOrigins(): string[] | true {
   return env.CORS_ORIGIN.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+}
+
+export function getGoogleClientIds(): string[] {
+  return Array.from(
+    new Set(
+      [
+        env.GOOGLE_CLIENT_ID,
+        env.GOOGLE_WEB_CLIENT_ID,
+        env.GOOGLE_ANDROID_CLIENT_ID,
+        env.GOOGLE_IOS_CLIENT_ID,
+      ]
+        .map((clientId) => clientId.trim())
+        .filter(Boolean),
+    ),
+  );
 }

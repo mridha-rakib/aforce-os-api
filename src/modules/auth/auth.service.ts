@@ -27,7 +27,6 @@ import type {
   LoginInput,
   LogoutInput,
   RefreshInput,
-  RegisterAdminInput,
   RegisterInput,
   ResendVerificationInput,
   VerifyEmailInput,
@@ -74,14 +73,6 @@ export class AuthService {
 
   public async register(input: RegisterInput): Promise<RegistrationResult> {
     return this.registerWithPassword(input, 'user');
-  }
-
-  public async registerAdmin(input: RegisterAdminInput): Promise<RegistrationResult> {
-    if (input.adminRegistrationSecret !== env.ADMIN_REGISTRATION_SECRET) {
-      throw new AuthenticationAppError('Invalid admin registration secret.');
-    }
-
-    return this.registerWithPassword(input, 'admin');
   }
 
   public async login(input: LoginInput): Promise<AuthSession> {

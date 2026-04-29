@@ -10,6 +10,7 @@
     "mcp:postman-routes": "tsx src/mcp/postman-routes.server.ts",
     "postman:sync": "tsx src/scripts/sync-postman.ts",
     "postman:watch": "tsx watch src/scripts/sync-postman.ts",
+    "seed:admin": "tsx src/scripts/seed-admin.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

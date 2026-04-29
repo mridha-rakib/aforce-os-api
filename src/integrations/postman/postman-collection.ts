@@ -1,11 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { ApiRouteDefinition, HttpMethod } from '../../common/http/base-route';
+import type { ApiRouteDefinition, HttpMethod, RouteAudience } from '../../common/http/base-route';
 
 const POSTMAN_COLLECTION_SCHEMA =
   'https://schema.getpostman.com/json/collection/v2.1.0/collection.json';
 const DEFAULT_EXPORT_PATH = path.resolve(process.cwd(), 'postman', 'aforce-api.collection.json');
+const ROUTE_AUDIENCE_ORDER: RouteAudience[] = ['admin', 'user', 'public'];
 
 interface PostmanUrl {
   readonly raw: string;
@@ -80,20 +81,42 @@ export function buildPostmanCollection(
 ): PostmanCollection {
   const baseUrl = options.baseUrl ?? '{{baseUrl}}';
   const collectionName = options.collectionName ?? 'AForce API';
-  const foldersByBasePath = new Map<string, { name: string; item: PostmanItem[] }>();
+  const foldersByAudience = new Map<RouteAudience, { name: string; item: PostmanItem[] }>();
+  const moduleFoldersByAudience = new Map<
+    RouteAudience,
+    Map<string, { name: string; item: PostmanItem[] }>
+  >();
 
   routes.forEach((route) => {
-    let folder = foldersByBasePath.get(route.basePath);
+    let audienceFolder = foldersByAudience.get(route.audience);
 
-    if (!folder) {
-      folder = {
+    if (!audienceFolder) {
+      audienceFolder = {
+        name: formatAudienceFolderName(route.audience),
+        item: [],
+      };
+      foldersByAudience.set(route.audience, audienceFolder);
+      moduleFoldersByAudience.set(route.audience, new Map());
+    }
+
+    const moduleFolders = moduleFoldersByAudience.get(route.audience);
+
+    if (!moduleFolders) {
+      return;
+    }
+
+    let moduleFolder = moduleFolders.get(route.basePath);
+
+    if (!moduleFolder) {
+      moduleFolder = {
         name: formatFolderName(route.basePath),
         item: [],
       };
-      foldersByBasePath.set(route.basePath, folder);
+      moduleFolders.set(route.basePath, moduleFolder);
+      audienceFolder.item.push(moduleFolder);
     }
 
-    folder.item.push(buildRequestItem(route, baseUrl));
+    moduleFolder.item.push(buildRequestItem(route, baseUrl));
   });
 
   const info: PostmanCollection['info'] = {
@@ -110,8 +133,37 @@ export function buildPostmanCollection(
         value: 'http://localhost:4000',
         type: 'string',
       },
+      {
+        key: 'appleIdentityToken',
+        value: 'paste-apple-identity-token-here',
+        type: 'string',
+      },
+      {
+        key: 'emailVerificationToken',
+        value: 'paste-email-verification-token-here',
+        type: 'string',
+      },
+      {
+        key: 'googleIdToken',
+        value: 'paste-google-id-token-here',
+        type: 'string',
+      },
+      {
+        key: 'refreshToken',
+        value: 'paste-refresh-token-here',
+        type: 'string',
+      },
+      {
+        key: 'userId',
+        value: 'paste-user-id-here',
+        type: 'string',
+      },
     ],
-    item: Array.from(foldersByBasePath.values()),
+    item: ROUTE_AUDIENCE_ORDER.flatMap((audience) => {
+      const folder = foldersByAudience.get(audience);
+
+      return folder ? [folder] : [];
+    }),
   };
 
   return collection;
@@ -160,8 +212,10 @@ export async function syncPostmanCollection(
 }
 
 function buildRequestItem(route: ApiRouteDefinition, baseUrl: string): PostmanItem {
+  const exampleBody = getRequestBodyExample(route);
+
   return {
-    name: `${route.method} ${route.fullPath}`,
+    name: route.name ?? `${route.method} ${route.fullPath}`,
     request: {
       method: route.method,
       header: needsRequestBody(route.method)
@@ -181,7 +235,7 @@ function buildRequestItem(route: ApiRouteDefinition, baseUrl: string): PostmanIt
         ? {
             body: {
               mode: 'raw',
-              raw: '{}',
+              raw: JSON.stringify(exampleBody, null, 2),
               options: {
                 raw: {
                   language: 'json',
@@ -198,6 +252,126 @@ function needsRequestBody(method: HttpMethod): boolean {
   return method === 'PATCH' || method === 'POST' || method === 'PUT';
 }
 
+function getRequestBodyExample(route: ApiRouteDefinition): Record<string, unknown> {
+  const routeKey = `${route.method} ${normalizeRoutePath(route.basePath, route.path)}`;
+  const examples: Record<string, Record<string, unknown>> = {
+    'POST /auth/register': {
+      displayName: 'Alex Rivera',
+      email: 'alex.rivera@example.com',
+      firstName: 'Alex',
+      lastName: 'Rivera',
+      password: 'Password123',
+    },
+    'POST /auth/login': {
+      email: 'alex.rivera@example.com',
+      password: 'Password123',
+    },
+    'POST /auth/verify-email': {
+      token: '{{emailVerificationToken}}',
+    },
+    'POST /auth/resend-verification': {
+      email: 'alex.rivera@example.com',
+    },
+    'POST /auth/refresh': {
+      refreshToken: '{{refreshToken}}',
+    },
+    'POST /auth/logout': {
+      refreshToken: '{{refreshToken}}',
+    },
+    'POST /auth/google': {
+      idToken: '{{googleIdToken}}',
+    },
+    'POST /auth/apple': {
+      displayName: 'Alex Rivera',
+      identityToken: '{{appleIdentityToken}}',
+    },
+    'POST /ai/hydration-decision': {
+      context: {
+        ambientTempC: 29,
+        humidityPct: 68,
+        sleepHours: 7.5,
+        steps: 8200,
+        workoutMinutes: 45,
+      },
+      intakeToday: {
+        electrolyteMl: 500,
+        waterMl: 1200,
+      },
+      profile: {
+        activityLevel: 'moderate',
+        goal: 'performance',
+        weightKg: 75,
+      },
+      signals: {
+        heartRateBpm: 82,
+        sweatRateDeltaPct: 12,
+        thirstLevel: 3,
+        urineColorScore: 4,
+      },
+      userId: '{{userId}}',
+    },
+    'POST /hydration-plans/generate': {
+      context: {
+        ambientTempC: 29,
+        humidityPct: 68,
+        sleepHours: 7.5,
+        steps: 8200,
+        wakeHour: 7,
+        workoutMinutes: 45,
+        workoutStartHour: 18,
+      },
+      intakeToday: {
+        electrolyteMl: 500,
+        waterMl: 1200,
+      },
+      profile: {
+        activityLevel: 'moderate',
+        goal: 'performance',
+        weightKg: 75,
+      },
+      userId: '{{userId}}',
+    },
+    'POST /intake-logs': {
+      amountMl: 500,
+      consumedAt: new Date('2026-04-27T09:30:00.000Z').toISOString(),
+      electrolyteStrength: 'medium',
+      hydrationScoreDelta: 8,
+      notes: 'Morning hydration stick after workout.',
+      productName: 'AForce Hydration Stick',
+      productSku: 'AF-HYDRATION-STICK-LIME',
+      source: 'electrolyte',
+      userId: '{{userId}}',
+    },
+    'POST /nfc-tags/register': {
+      batchCode: 'BATCH-2026-04',
+      electrolyteBoost: 12,
+      flavor: 'Lime',
+      hydrationBoost: 20,
+      productName: 'AForce Hydration Stick',
+      productSku: 'AF-HYDRATION-STICK-LIME',
+      status: 'active',
+      tagUid: '04A1B2C3D4E5F6',
+      volumeMl: 500,
+    },
+    'POST /nfc-tags/scan': {
+      deviceId: 'device-iphone-14-pro-max',
+      scannedAt: new Date('2026-04-27T09:35:00.000Z').toISOString(),
+      tagUid: '04A1B2C3D4E5F6',
+      userId: '{{userId}}',
+    },
+  };
+
+  return examples[routeKey] ?? {};
+}
+
+function normalizeRoutePath(basePath: string, routePath: string): string {
+  const normalized = `${basePath}/${routePath}`
+    .replace(/\/+/g, '/')
+    .replace(/\/$/, '');
+
+  return normalized || '/';
+}
+
 function formatFolderName(basePath: string): string {
   const normalized = basePath.replace(/^\/+|\/+$/g, '');
 
@@ -209,6 +383,17 @@ function formatFolderName(basePath: string): string {
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function formatAudienceFolderName(audience: RouteAudience): string {
+  switch (audience) {
+    case 'admin':
+      return 'Admin Routes';
+    case 'public':
+      return 'Public Routes';
+    case 'user':
+      return 'User Routes';
+  }
 }
 
 async function createPostmanCollection(
