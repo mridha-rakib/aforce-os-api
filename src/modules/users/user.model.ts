@@ -38,6 +38,12 @@ const userSchema = new Schema(
       trim: true,
       type: String,
     },
+    hydrationScore: {
+      default: 0,
+      max: 100,
+      min: 0,
+      type: Number,
+    },
     lastName: {
       trim: true,
       type: String,
@@ -62,6 +68,20 @@ const userSchema = new Schema(
     role: {
       default: 'user',
       enum: ['admin', 'user'],
+      index: true,
+      required: true,
+      type: String,
+    },
+    status: {
+      default: 'Active',
+      enum: ['Active', 'Blocked'],
+      index: true,
+      required: true,
+      type: String,
+    },
+    subscription: {
+      default: 'Free',
+      enum: ['Free', 'Pro', 'Enterprise'],
       index: true,
       required: true,
       type: String,

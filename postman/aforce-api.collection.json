@@ -17,8 +17,13 @@
       "type": "string"
     },
     {
-      "key": "emailVerificationToken",
-      "value": "paste-email-verification-token-here",
+      "key": "emailVerificationCode",
+      "value": "paste-email-verification-code-here",
+      "type": "string"
+    },
+    {
+      "key": "passwordResetCode",
+      "value": "paste-password-reset-code-here",
       "type": "string"
     },
     {
@@ -134,7 +139,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"token\": \"{{emailVerificationToken}}\"\n}",
+                  "raw": "{\n  \"code\": \"{{emailVerificationCode}}\",\n  \"email\": \"alex.rivera@example.com\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -168,6 +173,72 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"alex.rivera@example.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Request Password Reset Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "forgot-password"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"alex.rivera@example.com\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Reset Password With Code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "reset-password"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"{{passwordResetCode}}\",\n  \"email\": \"alex.rivera@example.com\",\n  \"password\": \"NewPassword123\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"

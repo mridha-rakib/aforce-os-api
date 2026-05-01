@@ -7,8 +7,8 @@ export class AiController extends BaseController {
     super();
   }
 
-  public readonly getHydrationDecision = this.handleRequest((request, response) => {
-    const decision = this.service.calculateHydrationDecision(request.body as HydrationDecisionInput);
+  public readonly getHydrationDecision = this.handleRequest(async (request, response) => {
+    const decision = await this.service.generateHydrationDecision(request.body as HydrationDecisionInput);
     this.ok(response, 'Hydration decision generated successfully.', decision);
   });
 }

@@ -2,12 +2,14 @@ import { BaseController } from '../../common/http/base-controller';
 import { authService, type AuthService } from './auth.service';
 import type {
   AppleLoginInput,
+  ForgotPasswordInput,
   GoogleLoginInput,
   LoginInput,
   LogoutInput,
   RefreshInput,
   RegisterInput,
   ResendVerificationInput,
+  ResetPasswordInput,
   VerifyEmailInput,
 } from './auth.schema';
 
@@ -27,13 +29,23 @@ export class AuthController extends BaseController {
   });
 
   public readonly verifyEmail = this.handleRequest(async (request, response) => {
-    const user = await this.service.verifyEmail(request.body as VerifyEmailInput);
-    this.ok(response, 'Email verified successfully.', user);
+    const session = await this.service.verifyEmail(request.body as VerifyEmailInput);
+    this.ok(response, 'Email verified successfully.', session);
   });
 
   public readonly resendVerification = this.handleRequest(async (request, response) => {
     const result = await this.service.resendVerification(request.body as ResendVerificationInput);
     this.ok(response, 'Verification email sent if the account requires it.', result);
+  });
+
+  public readonly forgotPassword = this.handleRequest(async (request, response) => {
+    const result = await this.service.forgotPassword(request.body as ForgotPasswordInput);
+    this.ok(response, 'Password reset code sent if the account exists.', result);
+  });
+
+  public readonly resetPassword = this.handleRequest(async (request, response) => {
+    const user = await this.service.resetPassword(request.body as ResetPasswordInput);
+    this.ok(response, 'Password reset successfully.', user);
   });
 
   public readonly refresh = this.handleRequest(async (request, response) => {

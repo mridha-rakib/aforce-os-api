@@ -139,8 +139,13 @@ export function buildPostmanCollection(
         type: 'string',
       },
       {
-        key: 'emailVerificationToken',
-        value: 'paste-email-verification-token-here',
+        key: 'emailVerificationCode',
+        value: 'paste-email-verification-code-here',
+        type: 'string',
+      },
+      {
+        key: 'passwordResetCode',
+        value: 'paste-password-reset-code-here',
         type: 'string',
       },
       {
@@ -267,10 +272,19 @@ function getRequestBodyExample(route: ApiRouteDefinition): Record<string, unknow
       password: 'Password123',
     },
     'POST /auth/verify-email': {
-      token: '{{emailVerificationToken}}',
+      code: '{{emailVerificationCode}}',
+      email: 'alex.rivera@example.com',
     },
     'POST /auth/resend-verification': {
       email: 'alex.rivera@example.com',
+    },
+    'POST /auth/forgot-password': {
+      email: 'alex.rivera@example.com',
+    },
+    'POST /auth/reset-password': {
+      code: '{{passwordResetCode}}',
+      email: 'alex.rivera@example.com',
+      password: 'NewPassword123',
     },
     'POST /auth/refresh': {
       refreshToken: '{{refreshToken}}',

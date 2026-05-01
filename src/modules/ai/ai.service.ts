@@ -1,7 +1,23 @@
 import { env } from '../../config/env';
+import {
+  openAiHydrationCoachService,
+  type OpenAiHydrationCoachService,
+} from '../../integrations/openai/hydration-coach.service';
 import type { HydrationDecisionInput } from './ai.schema';
 
+export interface HydrationCoachingCopy {
+  disclaimer: string;
+  headline: string;
+  nextActionText: string;
+  notificationBody: string;
+  notificationTitle: string;
+  source: 'openai' | 'rules' | 'rules-fallback';
+  summary: string;
+  why: string[];
+}
+
 export interface HydrationDecision {
+  coaching: HydrationCoachingCopy;
   consumedMl: number;
   drivers: string[];
   electrolyteRecommendedMl: number;
@@ -42,6 +58,11 @@ function roundToNearest50(value: number): number {
 }
 
 export class AiService {
+  public constructor(
+    private readonly hydrationCoach: OpenAiHydrationCoachService = openAiHydrationCoachService,
+    private readonly engineMode: typeof env.AI_ENGINE_MODE = env.AI_ENGINE_MODE,
+  ) {}
+
   public calculateHydrationDecision(input: HydrationDecisionInput): HydrationDecision {
     const baseTargetMl = this.calculateBaseTarget(input);
     const contextLoadMl = this.calculateContextLoad(input);
@@ -74,12 +95,29 @@ export class AiService {
     const drivers = this.buildDrivers(input);
     const recommendations = this.buildRecommendations(input, remainingMl, electrolyteRecommendedMl, riskLevel);
     const explanation = `Target ${hydrationTargetMl}ml today based on body mass, activity load, climate, and recent signals. Current risk is ${riskLevel} with ${remainingMl}ml still remaining.`;
+    const coaching = this.buildRulesCoaching(
+      {
+        consumedMl,
+        drivers,
+        electrolyteRecommendedMl,
+        explanation,
+        hydrationRiskScore,
+        hydrationTargetMl,
+        nextAction,
+        recommendations,
+        remainingMl,
+        riskLevel,
+        urgency,
+      },
+      'rules',
+    );
 
     return {
+      coaching,
       consumedMl,
       drivers,
       electrolyteRecommendedMl,
-      engineMode: env.AI_ENGINE_MODE,
+      engineMode: this.engineMode,
       explanation,
       hydrationRiskScore,
       hydrationTargetMl,
@@ -88,6 +126,47 @@ export class AiService {
       remainingMl,
       riskLevel,
       urgency,
+    };
+  }
+
+  public async generateHydrationDecision(input: HydrationDecisionInput): Promise<HydrationDecision> {
+    const decision = this.calculateHydrationDecision(input);
+
+    if (this.engineMode !== 'hybrid') {
+      return decision;
+    }
+
+    const aiCoaching = await this.hydrationCoach.generateCoaching(input, decision);
+
+    return {
+      ...decision,
+      coaching: aiCoaching ?? this.buildRulesCoaching(decision, 'rules-fallback'),
+    };
+  }
+
+  private buildRulesCoaching(
+    decision: Omit<HydrationDecision, 'coaching' | 'engineMode'>,
+    source: HydrationCoachingCopy['source'],
+  ): HydrationCoachingCopy {
+    const action = decision.nextAction;
+    const actionText =
+      action.type === 'maintain'
+        ? 'Maintain steady hydration and check in again later today.'
+        : `Take ${action.amountMl}ml ${action.type === 'drink-electrolyte' ? 'electrolyte-rich fluid' : 'water'} now.`;
+    const notificationBody =
+      action.type === 'maintain'
+        ? 'Hydration is on track. Keep sipping steadily through the day.'
+        : `${decision.riskLevel.toUpperCase()} hydration risk: ${actionText}`;
+
+    return {
+      disclaimer: 'Wellness guidance only; seek medical help for severe symptoms or medical concerns.',
+      headline: `Hydration risk is ${decision.riskLevel}`,
+      nextActionText: actionText,
+      notificationBody,
+      notificationTitle: decision.urgency === 'now' ? 'Hydration action needed' : 'Hydration check-in',
+      source,
+      summary: decision.explanation,
+      why: decision.drivers.slice(0, 3),
     };
   }
 

@@ -23,12 +23,14 @@ import { oauthService, type OAuthService } from './oauth.service';
 import { passwordService, type PasswordService } from './password.service';
 import type {
   AppleLoginInput,
+  ForgotPasswordInput,
   GoogleLoginInput,
   LoginInput,
   LogoutInput,
   RefreshInput,
   RegisterInput,
   ResendVerificationInput,
+  ResetPasswordInput,
   VerifyEmailInput,
 } from './auth.schema';
 
@@ -97,12 +99,21 @@ export class AuthService {
     return this.issueSession(user);
   }
 
-  public async verifyEmail(input: VerifyEmailInput): Promise<PublicUser> {
-    const tokenHash = this.hashEmailVerificationToken(input.token);
-    const verificationToken = await this.tokens.findActiveEmailVerificationToken(tokenHash);
+  public async verifyEmail(input: VerifyEmailInput): Promise<AuthSession> {
+    const userToVerify = await this.users.findByEmail(input.email);
+
+    if (!userToVerify) {
+      throw new AuthenticationAppError('Invalid or expired email verification code.');
+    }
+
+    const tokenHash = this.hashEmailVerificationCode(userToVerify.id, input.code);
+    const verificationToken = await this.tokens.findActiveEmailVerificationTokenForUser(
+      userToVerify.id,
+      tokenHash,
+    );
 
     if (!verificationToken) {
-      throw new AuthenticationAppError('Invalid or expired email verification token.');
+      throw new AuthenticationAppError('Invalid or expired email verification code.');
     }
 
     await this.tokens.markEmailVerificationTokenUsed(tokenHash);
@@ -112,7 +123,7 @@ export class AuthService {
       throw new ResourceNotFoundError('user', { userId: verificationToken.userId });
     }
 
-    return this.toPublicUser(user);
+    return this.issueSession(user);
   }
 
   public async resendVerification(input: ResendVerificationInput): Promise<{ readonly sent: boolean }> {
@@ -125,6 +136,52 @@ export class AuthService {
     await this.sendVerificationEmail(user);
 
     return { sent: true };
+  }
+
+  public async forgotPassword(input: ForgotPasswordInput): Promise<{ readonly sent: boolean }> {
+    const user = await this.users.findByEmail(input.email);
+
+    if (!user) {
+      return { sent: true };
+    }
+
+    await this.sendPasswordResetEmail(user);
+
+    return { sent: true };
+  }
+
+  public async resetPassword(input: ResetPasswordInput): Promise<PublicUser> {
+    const user = await this.users.findByEmail(input.email);
+
+    if (!user) {
+      throw new AuthenticationAppError('Invalid or expired password reset code.');
+    }
+
+    const tokenHash = this.hashPasswordResetCode(user.id, input.code);
+    const resetToken = await this.tokens.findActivePasswordResetTokenForUser(user.id, tokenHash);
+
+    if (!resetToken) {
+      throw new AuthenticationAppError('Invalid or expired password reset code.');
+    }
+
+    const passwordHash = await this.passwords.hash(input.password);
+    await this.tokens.markPasswordResetTokenUsed(tokenHash);
+
+    const updatedUser = await this.users.updatePasswordProvider(user.id, passwordHash);
+
+    if (!updatedUser) {
+      throw new ResourceNotFoundError('user', { userId: user.id });
+    }
+
+    if (!updatedUser.emailVerifiedAt) {
+      const verifiedUser = await this.users.markEmailVerified(updatedUser.id);
+
+      if (verifiedUser) {
+        return this.toPublicUser(verifiedUser);
+      }
+    }
+
+    return this.toPublicUser(updatedUser);
   }
 
   public async refresh(input: RefreshInput): Promise<AuthSession> {
@@ -296,6 +353,10 @@ export class AuthService {
   }
 
   private async issueSession(user: UserRecord): Promise<AuthSession> {
+    if (user.status === 'Blocked') {
+      throw new AuthenticationAppError('This account is blocked. Contact support.');
+    }
+
     const tokenPair = this.jwt.issueTokenPair({
       email: user.email,
       role: user.role,
@@ -322,21 +383,47 @@ export class AuthService {
   }
 
   private async sendVerificationEmail(user: UserRecord): Promise<void> {
-    const token = crypto.randomBytes(32).toString('hex');
+    const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 
+    await this.tokens.markActiveEmailVerificationTokensUsedForUser(user.id);
     await this.tokens.createEmailVerificationToken({
       expiresAt: new Date(Date.now() + env.EMAIL_VERIFICATION_TTL_SECONDS * 1000),
-      tokenHash: this.hashEmailVerificationToken(token),
+      tokenHash: this.hashEmailVerificationCode(user.id, code),
       userId: user.id,
     });
     await this.email.sendVerificationEmail({
+      code,
       email: user.email,
-      token,
     });
   }
 
-  private hashEmailVerificationToken(token: string): string {
-    return crypto.createHmac('sha256', env.EMAIL_VERIFICATION_SECRET).update(token).digest('hex');
+  private async sendPasswordResetEmail(user: UserRecord): Promise<void> {
+    const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+
+    await this.tokens.markActivePasswordResetTokensUsedForUser(user.id);
+    await this.tokens.createPasswordResetToken({
+      expiresAt: new Date(Date.now() + env.PASSWORD_RESET_TTL_SECONDS * 1000),
+      tokenHash: this.hashPasswordResetCode(user.id, code),
+      userId: user.id,
+    });
+    await this.email.sendPasswordResetEmail({
+      code,
+      email: user.email,
+    });
+  }
+
+  private hashEmailVerificationCode(userId: string, code: string): string {
+    return crypto
+      .createHmac('sha256', env.EMAIL_VERIFICATION_SECRET)
+      .update(`${userId}:${code}`)
+      .digest('hex');
+  }
+
+  private hashPasswordResetCode(userId: string, code: string): string {
+    return crypto
+      .createHmac('sha256', env.EMAIL_VERIFICATION_SECRET)
+      .update(`password-reset:${userId}:${code}`)
+      .digest('hex');
   }
 
   private toPublicUser(user: UserRecord): PublicUser {

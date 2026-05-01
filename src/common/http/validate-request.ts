@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import type { ZodTypeAny } from 'zod';
+import { ZodError, type ZodTypeAny } from 'zod';
 
 import { ValidationAppError } from '../errors/http-errors';
 
@@ -22,12 +22,19 @@ export class RequestValidator {
         }
 
         if (schemas.query) {
-          request.query = schemas.query.parse(request.query) as typeof request.query;
+          Object.defineProperty(request, 'query', {
+            configurable: true,
+            enumerable: true,
+            value: schemas.query.parse(request.query),
+            writable: true,
+          });
         }
 
         next();
       } catch (error) {
-        next(new ValidationAppError('Request validation failed.', error));
+        const details = error instanceof ZodError ? error.flatten() : error;
+
+        next(new ValidationAppError('Request validation failed.', details));
       }
     };
   }

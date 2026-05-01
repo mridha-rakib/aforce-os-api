@@ -3,6 +3,8 @@ import type { HydratedDocument, UpdateQuery } from 'mongoose';
 import { UserModel, type User } from './user.model';
 
 export type UserRole = 'admin' | 'user';
+export type UserStatus = 'Active' | 'Blocked';
+export type UserSubscription = 'Free' | 'Pro' | 'Enterprise';
 
 export interface CreateUserInput {
   readonly appleSubject?: string;
@@ -12,6 +14,7 @@ export interface CreateUserInput {
   readonly emailVerifiedAt?: Date;
   readonly firstName?: string;
   readonly googleId?: string;
+  readonly hydrationScore?: number;
   readonly lastName?: string;
   readonly passwordHash?: string;
   readonly providers?: {
@@ -20,6 +23,8 @@ export interface CreateUserInput {
     readonly password?: boolean;
   };
   readonly role: UserRole;
+  readonly status?: UserStatus;
+  readonly subscription?: UserSubscription;
 }
 
 export interface UserRecord {
@@ -31,6 +36,7 @@ export interface UserRecord {
   readonly emailVerifiedAt?: Date;
   readonly firstName?: string;
   readonly googleId?: string;
+  readonly hydrationScore: number;
   readonly id: string;
   readonly lastName?: string;
   readonly passwordHash?: string;
@@ -40,19 +46,45 @@ export interface UserRecord {
     readonly password: boolean;
   };
   readonly role: UserRole;
+  readonly status: UserStatus;
+  readonly subscription: UserSubscription;
   readonly updatedAt: Date;
 }
 
-interface UserSnapshot extends User {
+export interface ListUsersInput {
+  readonly search?: string;
+  readonly status?: UserStatus;
+  readonly subscription?: UserSubscription;
+}
+
+export interface UpdateUserInput {
+  readonly displayName?: string;
+  readonly email?: string;
+  readonly hydrationScore?: number;
+  readonly status?: UserStatus;
+  readonly subscription?: UserSubscription;
+}
+
+interface UserSnapshot {
   appleSubject?: string | null;
   avatarUrl?: string | null;
   createdAt: Date;
   displayName?: string | null;
+  email: string;
   emailVerifiedAt?: Date | null;
   firstName?: string | null;
   googleId?: string | null;
+  hydrationScore?: number | null;
   lastName?: string | null;
   passwordHash?: string | null;
+  providers?: {
+    apple?: boolean | null;
+    google?: boolean | null;
+    password?: boolean | null;
+  } | null;
+  role: UserRole;
+  status?: UserStatus | null;
+  subscription?: UserSubscription | null;
   updatedAt: Date;
 }
 
@@ -76,6 +108,59 @@ export class UserRepository {
     return document ? this.toRecord(document) : null;
   }
 
+  public async deleteById(userId: string): Promise<UserRecord | null> {
+    const document = await UserModel.findOneAndDelete({ _id: userId, role: 'user' }).exec();
+
+    return document ? this.toRecord(document) : null;
+  }
+
+  public async findMany(input: ListUsersInput = {}): Promise<UserRecord[]> {
+    const filter: Record<string, unknown> = {
+      role: 'user',
+    };
+    const andFilters: Record<string, unknown>[] = [];
+
+    if (input.status) {
+      if (input.status === 'Active') {
+        andFilters.push({
+          $or: [{ status: 'Active' }, { status: { $exists: false } }],
+        });
+      } else {
+        filter.status = input.status;
+      }
+    }
+
+    if (input.subscription) {
+      if (input.subscription === 'Free') {
+        andFilters.push({
+          $or: [{ subscription: 'Free' }, { subscription: { $exists: false } }],
+        });
+      } else {
+        filter.subscription = input.subscription;
+      }
+    }
+
+    if (input.search) {
+      const searchPattern = new RegExp(input.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      andFilters.push({
+        $or: [
+          { email: searchPattern },
+          { displayName: searchPattern },
+          { firstName: searchPattern },
+          { lastName: searchPattern },
+        ],
+      });
+    }
+
+    if (andFilters.length > 0) {
+      filter.$and = andFilters;
+    }
+
+    const documents = await UserModel.find(filter).sort({ createdAt: -1 }).exec();
+
+    return documents.map((document) => this.toRecord(document));
+  }
+
   public async findByAppleSubject(appleSubject: string): Promise<UserRecord | null> {
     const document = await UserModel.findOne({ appleSubject }).exec();
 
@@ -92,6 +177,38 @@ export class UserRepository {
     const document = await UserModel.findByIdAndUpdate(
       userId,
       { $set: { emailVerifiedAt: verifiedAt } },
+      { new: true },
+    ).exec();
+
+    return document ? this.toRecord(document) : null;
+  }
+
+  public async updateById(userId: string, input: UpdateUserInput): Promise<UserRecord | null> {
+    const $set: Record<string, unknown> = {};
+
+    if (input.displayName !== undefined) {
+      $set.displayName = input.displayName;
+    }
+
+    if (input.email !== undefined) {
+      $set.email = input.email.toLowerCase();
+    }
+
+    if (input.hydrationScore !== undefined) {
+      $set.hydrationScore = input.hydrationScore;
+    }
+
+    if (input.status !== undefined) {
+      $set.status = input.status;
+    }
+
+    if (input.subscription !== undefined) {
+      $set.subscription = input.subscription;
+    }
+
+    const document = await UserModel.findOneAndUpdate(
+      { _id: userId, role: 'user' },
+      { $set },
       { new: true },
     ).exec();
 
@@ -198,12 +315,24 @@ export class UserRepository {
       document.googleId = input.googleId;
     }
 
+    if (input.hydrationScore !== undefined) {
+      document.hydrationScore = input.hydrationScore;
+    }
+
     if (input.lastName) {
       document.lastName = input.lastName;
     }
 
     if (input.passwordHash) {
       document.passwordHash = input.passwordHash;
+    }
+
+    if (input.status) {
+      document.status = input.status;
+    }
+
+    if (input.subscription) {
+      document.subscription = input.subscription;
     }
   }
 
@@ -212,6 +341,7 @@ export class UserRepository {
     const record: UserRecord = {
       createdAt: snapshot.createdAt,
       email: snapshot.email,
+      hydrationScore: snapshot.hydrationScore ?? 0,
       id: document.id,
       providers: {
         apple: snapshot.providers?.apple ?? false,
@@ -219,6 +349,8 @@ export class UserRepository {
         password: snapshot.providers?.password ?? false,
       },
       role: snapshot.role,
+      status: snapshot.status ?? 'Active',
+      subscription: snapshot.subscription ?? 'Free',
       updatedAt: snapshot.updatedAt,
     };
 

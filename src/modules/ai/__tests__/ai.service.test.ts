@@ -4,7 +4,7 @@ import { AiService } from '../ai.service';
 
 describe('AiService', () => {
   it('raises hydration demand for hot, high-strain workouts', () => {
-    const service = new AiService();
+    const service = new AiService(undefined, 'rules');
 
     const decision = service.calculateHydrationDecision({
       context: {
@@ -34,5 +34,34 @@ describe('AiService', () => {
     expect(decision.hydrationTargetMl).toBeGreaterThan(3500);
     expect(decision.electrolyteRecommendedMl).toBeGreaterThan(0);
     expect(['high', 'critical']).toContain(decision.riskLevel);
+  });
+
+  it('returns deterministic coaching copy without calling OpenAI in rules mode', async () => {
+    const service = new AiService(undefined, 'rules');
+
+    const decision = await service.generateHydrationDecision({
+      context: {
+        ambientTempC: 23,
+        humidityPct: 50,
+        sleepHours: 7,
+        steps: 3500,
+        workoutMinutes: 0,
+      },
+      intakeToday: {
+        electrolyteMl: 0,
+        waterMl: 1200,
+      },
+      profile: {
+        activityLevel: 'moderate',
+        goal: 'wellness',
+        weightKg: 70,
+      },
+      signals: {},
+      userId: 'user-002',
+    });
+
+    expect(decision.coaching.source).toBe('rules');
+    expect(decision.coaching.nextActionText.length).toBeGreaterThan(0);
+    expect(decision.hydrationTargetMl).toBeGreaterThan(0);
   });
 });

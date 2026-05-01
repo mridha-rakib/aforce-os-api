@@ -4,12 +4,14 @@ import { authenticate } from '../../common/middleware/auth.middleware';
 import { authController, type AuthController } from './auth.controller';
 import {
   appleLoginRequestSchema,
+  forgotPasswordRequestSchema,
   googleLoginRequestSchema,
   loginRequestSchema,
   logoutRequestSchema,
   refreshRequestSchema,
   registerRequestSchema,
   resendVerificationRequestSchema,
+  resetPasswordRequestSchema,
   verifyEmailRequestSchema,
 } from './auth.schema';
 
@@ -43,6 +45,18 @@ export class AuthRoute extends BaseRoute {
       { name: 'Resend Verification Email' },
       RequestValidator.validate(resendVerificationRequestSchema),
       this.controller.resendVerification,
+    );
+    this.post(
+      '/forgot-password',
+      { name: 'Request Password Reset Code' },
+      RequestValidator.validate(forgotPasswordRequestSchema),
+      this.controller.forgotPassword,
+    );
+    this.post(
+      '/reset-password',
+      { name: 'Reset Password With Code' },
+      RequestValidator.validate(resetPasswordRequestSchema),
+      this.controller.resetPassword,
     );
     this.post(
       '/refresh',

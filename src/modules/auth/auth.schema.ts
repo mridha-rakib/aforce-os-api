@@ -23,11 +23,22 @@ export const loginBodySchema = z.object({
 });
 
 export const verifyEmailBodySchema = z.object({
-  token: z.string().min(32),
+  code: z.string().trim().regex(/^\d{6}$/, 'Verification code must be 6 digits.'),
+  email: emailSchema,
 });
 
 export const resendVerificationBodySchema = z.object({
   email: emailSchema,
+});
+
+export const forgotPasswordBodySchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordBodySchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, 'Reset code must be 6 digits.'),
+  email: emailSchema,
+  password: passwordSchema,
 });
 
 export const refreshBodySchema = z.object({
@@ -63,6 +74,14 @@ export const resendVerificationRequestSchema = {
   body: resendVerificationBodySchema,
 };
 
+export const forgotPasswordRequestSchema = {
+  body: forgotPasswordBodySchema,
+};
+
+export const resetPasswordRequestSchema = {
+  body: resetPasswordBodySchema,
+};
+
 export const refreshRequestSchema = {
   body: refreshBodySchema,
 };
@@ -83,6 +102,8 @@ export type RegisterInput = z.infer<typeof registerBodySchema>;
 export type LoginInput = z.infer<typeof loginBodySchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailBodySchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationBodySchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordBodySchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordBodySchema>;
 export type RefreshInput = z.infer<typeof refreshBodySchema>;
 export type LogoutInput = z.infer<typeof logoutBodySchema>;
 export type GoogleLoginInput = z.infer<typeof googleLoginBodySchema>;
