@@ -4,9 +4,9 @@
   "description": "AForce backend API with module-based architecture and AI hydration services.",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "rimraf dist && tsc -p tsconfig.build.json",
-    "start": "node dist/server.js",
+    "dev": "node api.js && tsx watch src/server.ts",
+    "build": "node api.js && rimraf dist && tsc -p tsconfig.build.json",
+    "start": "node api.js && node dist/server.js",
     "mcp:postman-routes": "tsx src/mcp/postman-routes.server.ts",
     "postman:sync": "tsx src/scripts/sync-postman.ts",
     "postman:watch": "tsx watch src/scripts/sync-postman.ts",
